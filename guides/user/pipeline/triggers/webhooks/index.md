@@ -1,6 +1,6 @@
 ---
 layout: single
-title:  "Triggering on Webhooks"
+title: "Triggering Pipelines with Webhooks"
 sidebar:
   nav: guides
 redirect_from: /guides/user/triggers/webhooks/
@@ -8,29 +8,33 @@ redirect_from: /guides/user/triggers/webhooks/
 
 {% include toc %}
 
-In order to programatically trigger pipelines, you can send a `POST` call to
-Spinnaker at a preconfigured endpoint. This can be used to trigger pipelines
-when a CI job finishes, from the command line, or from a third-party system.
-The payload, whether it's one you are able to write, or it's provided to
-you, will be available in the Pipeline's execution.
+## Overview
 
-> **Note:**  It's possible to configure multiple pipelines to trigger off of
-> a single webhook.
+Spinnaker allows you to programmatically trigger pipelines using webhooks. By sending a `POST` request to a predefined Spinnaker endpoint, you can start a pipeline when:
 
-If you're triggering from a *GitHub* webhook, see the instructions
-[here](/setup/triggers/github/) to set up that webhook.
+- A CI/CD job completes
+- A third-party system triggers an event
+- A manual request is made via the command line
 
-If you're triggering to a Spinnaker with authentication, see the 
-instructions [here](/setup/security/authorization/#automated-pipeline-triggers) to set up the 
-automated trigger.
+The webhook payload—whether custom-defined or provided by an external service—will be accessible within the pipeline execution.
 
-## Adding a webhook trigger to a pipeline
+> **Note:** You can configure multiple pipelines to trigger from a single webhook.
 
-Assuming you have created a pipeline, under __Configuration__, select __Add
-Trigger__ and make its type selector __Webhook__.
+If you're using a *GitHub* webhook, follow the [GitHub trigger setup guide](/setup/triggers/github/).
 
-To assign an endpoint that must be hit, you can provide a value to the
-__Source__ field as shown here:
+If your Spinnaker instance has authentication enabled, refer to the [Automated Pipeline Triggers setup](/setup/security/authorization/#automated-pipeline-triggers).
+
+## Adding a Webhook Trigger to a Pipeline
+
+To add a webhook trigger to a pipeline:
+
+1. Open your pipeline in Spinnaker.
+2. Navigate to **Configuration**.
+3. Click **Add Trigger**.
+4. Set the **Type** to **Webhook**.
+5. Enter a unique value in the **Source** field.
+
+Spinnaker will generate an endpoint for the webhook, which you can use to trigger the pipeline.
 
 {%
   include
@@ -38,37 +42,41 @@ __Source__ field as shown here:
   image_path="./basic-webhook.png"
 %}
 
-Notice that in the above image below the __Type__ dropdown, the webhook
-configuration points out that we can hit
-`http://localhost:8084/webhooks/webhook/demo` to trigger the pipeline. The
-endpoint depends on how you've configured your [Spinnaker
-endpoints](/setup/security) -- if you're running on a different endpoint, e.g.
-`https://api.spinnaker-prod.net`, that'll be shown instead.
+In the example above, the pipeline can be triggered by sending a `POST` request to:
 
-Keeping track of that endpoint as `$ENDPOINT` (it will depend on where
-Spinnaker is installed), save that pipeline, and run:
-
-```bash
-curl $ENDPOINT -X POST -H "content-type: application/json" -d "{ }"
+```
+http://localhost:8084/webhooks/webhook/demo
 ```
 
-### Payload constraints
+If your Spinnaker instance is running on a different domain (e.g., `https://api.spinnaker-prod.net`), the correct URL will be displayed.
 
-If you want to ensure that a webhook only triggers when a certain payload
-arrives, you can provide __Payload Constraints__ in the trigger. These are
-key/value pairs where the key must be found in the incoming payload, and the
-value must match using regex.
+### Triggering the Pipeline via API
 
-For example, if we configured:
+Save the pipeline configuration and trigger it using:
+
+```bash
+curl $ENDPOINT -X POST -H "Content-Type: application/json" -d "{}"
+```
+
+Replace `$ENDPOINT` with the actual webhook URL generated for your pipeline.
+
+## Payload Constraints
+
+You can restrict a webhook trigger to specific payload conditions using **Payload Constraints**. These constraints define key-value pairs where:
+
+- The key must be present in the incoming payload.
+- The value must match a regex pattern.
+
+For example, with the following constraints:
 
 {%
   include
   figure
   image_path="./constraints-webhook.png"
-  caption="For clarity, the constraints are `foo = bar` and `bing = b.*p`."
+  caption="Payload constraints: `foo = bar` and `bing = b.*p`."
 %}
 
-The following payload would be accepted:
+This payload **will trigger** the pipeline:
 
 ```json
 {
@@ -78,7 +86,7 @@ The following payload would be accepted:
 }
 ```
 
-But this payload would be rejected (pipeline would not trigger):
+This payload **will not trigger** the pipeline:
 
 ```json
 {
@@ -87,26 +95,18 @@ But this payload would be rejected (pipeline would not trigger):
 }
 ```
 
-## Passing parameters
+## Passing Parameters
 
-Say your pipeline accepted some parameters (e.g. the desired stack to deploy
-to), you can make this explicit by adding a pipeline parameter on the same
-configuration screen as the webhook trigger:
+If your pipeline accepts parameters (e.g., selecting a deployment stack), define them under **Pipeline Parameters** in the webhook trigger configuration:
 
 {%
   include
   figure
   image_path="./parameters.png"
-  caption="For more information on how to use pipeline parameters, see the
-  [pipeline expressions guide](/guides/user/pipeline-expressions)."
+  caption="Refer to the [Pipeline Expressions Guide](/guides/user/pipeline-expressions) for more details."
 %}
 
-> Warning: there are several reserved parameter keys (names) that cause unexpected behavior and failures
-> if overwritten by a pipeline parameter definition.
-> See the [list of reserved parameter and evaluate variable key names](/guides/user/pipeline/expressions#list-of-reserved-parameter-and-evaluate-variable-key-names).
-
-If you were to manually execute this pipeline, you would be prompted with the
-following dialogue:
+When executing the pipeline manually, Spinnaker will prompt for parameter values:
 
 {%
   include
@@ -114,9 +114,9 @@ following dialogue:
   image_path="./manual-execution.png"
 %}
 
-If instead you were to trigger this pipeline with a Webhook, you could supply
-each parameter a value inside a key/value map called `parameters`. Take the
-following payload for example:
+### Supplying Parameters via Webhook
+
+When triggering a pipeline through a webhook, include parameters inside a `parameters` key in the payload:
 
 ```json
 {
@@ -126,19 +126,11 @@ following payload for example:
 }
 ```
 
-> **Note:** If you selected the __Required__ checkbox for a parameter
-> without providing a default, the pipeline will not trigger if a parameter is
-> not present. The difference between this and the preconditions covered
-> earlier is that when a precondition isn't met, Spinnaker will not even try to
-> run the pipeline. However, when a required parameter doesn't exist, Spinnaker
-> will try and fail to run a pipeline, surfacing a "Failed Execution" in the
-> UI.
+> **Note:** If a parameter is marked **Required** without a default value, the pipeline will fail if the parameter is missing.
 
-## Passing artifacts
+## Passing Artifacts
 
-If your pipeline requires artifacts (for example, a Kubernetes manifest file
-stored in GCS), you can make this explicit by defining an __Expected Artifact__
-and assigning it to the Webhook as shown below:
+If your pipeline requires artifacts (e.g., Kubernetes manifests in GCS), define them under **Expected Artifacts** in the webhook configuration:
 
 {%
   include
@@ -146,8 +138,7 @@ and assigning it to the Webhook as shown below:
   image_path="./artifacts.png"
 %}
 
-In order to run this pipeline, you will need to supply the required artifact in
-your payload under a list of `artifacts`:
+To pass an artifact in a webhook payload, use the `artifacts` list:
 
 ```json
 {
@@ -160,3 +151,12 @@ your payload under a list of `artifacts`:
   ]
 }
 ```
+
+## Testing Webhooks
+
+Before integrating webhooks into your workflow, test them using API request tools like:
+
+- **[Beeceptor](https://beeceptor.com/)** - Simulate and inspect HTTP requests.
+- **[Webhook.site](https://webhook.site/)** - Capture and debug webhook payloads.
+
+These tools help verify your webhook payloads and confirm pipeline triggers work as expected.
